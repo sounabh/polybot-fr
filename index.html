@@ -135,11 +135,6 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 #tp-presets{display:flex;gap:5px;flex-wrap:wrap;}
 .preset-btn{font-family:var(--mono);font-size:10px;padding:4px 9px;border-radius:5px;border:1px solid var(--b1);background:var(--s3);color:var(--t2);cursor:pointer;transition:.15s;}
 .preset-btn:hover{border-color:var(--teal);color:var(--teal);}
-.cli-box{background:var(--bg);border:1px solid var(--b1);border-radius:7px;padding:10px 12px;}
-.cli-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase;}
-.cli-cmd{font-family:var(--mono);font-size:11px;color:var(--teal);word-break:break-all;cursor:pointer;user-select:all;}
-.cli-cmd:hover{color:#5eead4;}
-
 /* MODAL */
 #modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;}
 #modal-overlay.hidden{display:none;}
@@ -276,11 +271,7 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
   <div class="sm mt" id="tp-bal-line"></div>
   <button class="btn btn-primary full" id="tp-btn" onclick="submitTrade()">Place Order via Server</button>
   <div id="tp-result"></div>
-  <div class="cli-box">
-    <div class="cli-lbl">Order reference</div>
-    <div class="cli-cmd" id="tp-cli" onclick="copyCLI()" title="Click to copy"></div>
-    <div style="font-size:9px;color:var(--t3);margin-top:4px">Market id / slug · Orders execute via server (CLOB v2)</div>
-  </div>
+  <p class="sm mt" style="font-size:10px;color:var(--t3);line-height:1.5">Orders are signed and sent by <strong>your Node server</strong> (CLOB v2). Fund your Polymarket proxy wallet with USDC on Polygon if the order stays pending.</p>
 </div>
 
 <!-- MARKET MODAL -->
@@ -295,6 +286,7 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 
 <!-- DASHBOARD -->
 <div id="p-dash" class="page active">
+  <div class="notice info mb16" style="font-size:12px;line-height:1.65"><strong>How this app works:</strong> The <strong>server</strong> holds your API keys and private key (from <code class="mono">.env</code>) and talks to Polymarket. The browser only calls your server. <strong>Dashboard</strong> shows balance and positions; <strong>Markets</strong> browses live markets; <strong>AI Trade</strong> suggests trades you confirm; <strong>Auto Bot</strong> runs a timed loop on the server and places at most one order per cycle within your daily limit and budget %.</div>
   <div class="sg6" id="dash-stats">
     <div class="sc"><div class="sl">BALANCE</div><div class="sv up" id="d-bal">—</div></div>
     <div class="sc"><div class="sl">REALIZED P&L</div><div class="sv" id="d-rp">—</div></div>
@@ -320,6 +312,7 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 
 <!-- MARKETS -->
 <div id="p-markets" class="page">
+  <div class="notice info mb12" style="font-size:12px;line-height:1.65"><strong>Markets:</strong> <em>All</em> loads high-24h-volume events across Polymarket (paginated on the server for more cards). Category tabs use tags plus a text match so you do not see the same politics markets under Cricket. Use <strong>Search</strong> for any keyword. Click a card for detail, or <strong>BUY YES/NO</strong> to trade in the side panel.</div>
   <div class="srch-row">
     <input class="srch-in" id="mkt-search" type="text" placeholder="Search any market…" oninput="filterMarkets()">
     <button class="btn btn-ghost" onclick="filterMarkets()">↻</button>
@@ -330,6 +323,7 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 
 <!-- AI TRADE -->
 <div id="p-ai" class="page">
+  <div class="notice info mb12" style="font-size:12px;line-height:1.65"><strong>AI Trade:</strong> Requires a Claude key in Settings. The model searches markets and may <strong>propose</strong> a trade; nothing executes until you press <strong>Confirm</strong>. This is separate from <strong>Auto Bot</strong>, which places orders automatically on a schedule when started.</div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <div><div class="ctitle">AI TRADING ASSISTANT</div><div class="sm mt">Ask in plain English — AI analyzes & suggests, you confirm to place</div></div>
     <button class="btn btn-ghost btn-sm" onclick="clearChat()">Clear</button>
@@ -359,11 +353,13 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 
 <!-- MY TRADES -->
 <div id="p-trades" class="page">
+  <div class="notice info mb12" style="font-size:12px;line-height:1.65"><strong>My Trades:</strong> Fills from your linked Polymarket proxy wallet (same account as <code class="mono">PRIVATE_KEY</code> on the server). Copying a leaderboard trade opens the trade panel for you — it is not automatic until you confirm.</div>
   <div class="card"><div class="ctitle mb12">COMPLETE TRADE HISTORY</div><div id="trades-content"><div class="ldr"><div class="sp"></div></div></div></div>
 </div>
 
 <!-- AUTO BOT -->
 <div id="p-bot" class="page">
+  <div class="notice info mb16" style="font-size:12px;line-height:1.65"><strong>Auto Bot (server):</strong> After <strong>Start</strong>, the first scan runs in ~10s, then every <code class="mono">BOT_CHECK_INTERVAL_MIN</code> minutes (default 15). Each cycle loads portfolio, leaderboard activity, and many markets; scores them (volume, liquidity, implied odds, top-trader alignment, leaderboard PnL context); respects <strong>daily limit</strong>, <strong>max % per trade</strong>, <strong>max exposure</strong>, and <strong>min score</strong>; then places <em>at most one</em> buy if a setup clears the bar. Ensure <code class="mono">PRIVATE_KEY</code> and funded USDC — otherwise orders may stay simulated/pending.</div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
     <div class="bot-dot" id="bot-dot"></div>
     <span id="bot-lbl" style="font-size:16px;font-weight:700;letter-spacing:.04em">STOPPED</span>
@@ -433,6 +429,7 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
 <!-- SETTINGS -->
 <div id="p-settings" class="page">
   <div style="max-width:600px">
+    <div class="notice info mb16" style="font-size:12px;line-height:1.65"><strong>Settings:</strong> Claude key is stored in server memory (and optionally <code class="mono">CLAUDE_API_KEY</code> in <code class="mono">.env</code>). Risk values here match the Auto Bot caps — save before starting the bot if you change them.</div>
     <div class="card mb16">
       <div class="ctitle mb12">👤 YOUR ACCOUNT</div>
       <div id="settings-account"><div class="empty">Loading…</div></div>

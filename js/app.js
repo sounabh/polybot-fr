@@ -308,6 +308,7 @@ async function loadProfile() {
   }
 
   ge('profile-content').innerHTML = `
+    <div class="notice info mb16" style="font-size:12px;line-height:1.65"><strong>Profile:</strong> Data comes from Polymarket’s public profile and Data API for the wallet in <code class="mono">PRIVATE_KEY</code>. Balance may reflect on-chain pUSD if <code class="mono">POLYGON_RPC_URL</code> is set. Use <strong>SELL</strong> on a row to close a position via the same server-signed flow as buys.</div>
     <div class="profile-hero">
       <div class="av">
         ${port.avatar?`<img src="${port.avatar}" onerror="this.style.display='none'">` : ''}
@@ -387,7 +388,7 @@ function selCat(id, tag) {
 async function loadMarkets(tag) {
   const search = ge('mkt-search')?.value?.trim() || '';
   ge('mkt-grid').innerHTML = ldr('Loading markets…');
-  const params = new URLSearchParams({ limit: 40 });
+  const params = new URLSearchParams({ limit: '150' });
   const cat = CATS.find(c => c.id === App.cat);
   if (cat?.tag) params.set('tag', cat.tag);
   if (tag)      params.set('tag', tag);
@@ -401,7 +402,7 @@ function filterMarkets() { const cat = CATS.find(c => c.id === App.cat); loadMar
 
 function renderMktGrid(mkts) {
   if (!mkts.length) { ge('mkt-grid').innerHTML = empty('No markets found'); return; }
-  ge('mkt-grid').innerHTML = mkts.slice(0, 40).map(m => `
+  ge('mkt-grid').innerHTML = mkts.map(m => `
     <div class="mc" onclick="openModal('${m.id}')">
       ${m.image ? `<img class="mc-img" src="${m.image}" onerror="this.remove()">` : `<div class="mc-ph">${m.category?.slice(0,2)||'📊'}</div>`}
       <div class="mc-body">
@@ -482,7 +483,6 @@ function openBuy(id, slug, title, outcome, price, pct) {
 
   ge('tp-amt').value = '';   // Always blank — user types their own amount
   ge('tp-result').innerHTML = '';
-  updateCLI();
   ge('tp').classList.remove('hidden');
   closeModal();
 }
@@ -511,27 +511,12 @@ function openSell(id, title, outcome, currentPrice, maxSize) {
 
   ge('tp-amt').value = sz.toFixed(2);
   ge('tp-result').innerHTML = '';
-  updateCLI();
   ge('tp').classList.remove('hidden');
 }
 
 function closeTP() { ge('tp').classList.add('hidden'); ge('tp-amt').value=''; ge('tp-result').innerHTML=''; }
-function setAmt(v) { ge('tp-amt').value = parseFloat(v).toFixed(2); updateCLI(); }
-function onAmtChange() { updateCLI(); }
-
-function updateCLI() {
-  const id      = ge('tp-market').value || '';
-  const slug    = ge('tp-slug').value || '';
-  const outcome = ge('tp-outcome').textContent.replace('SELL: ','');
-  const amt     = ge('tp-amt').value || '[amount]';
-  const side    = ge('tp-side').value || 'buy';
-  ge('tp-cli').textContent = `${side.toUpperCase()} ${outcome} · market ${id}${slug && slug !== id ? ` · slug ${slug}` : ''} · ${amt} USDC`;
-}
-
-function copyCLI() {
-  const t = ge('tp-cli').textContent;
-  navigator.clipboard.writeText(t).then(() => toast('Copied to clipboard','ok')).catch(() => {});
-}
+function setAmt(v) { ge('tp-amt').value = parseFloat(v).toFixed(2); }
+function onAmtChange() { /* amount only used on submit */ }
 
 // ── Submit BUY ─────────────────────────────────────────────
 async function submitTrade() {
@@ -686,7 +671,6 @@ function copyTrade(id, title, outcome, price, sz) {
   const slug    = App.markets.find(m => m.id === id)?.slug || id;
   openBuy(id, slug, title, outcome, price, Math.round(parseFloat(price)*100));
   ge('tp-amt').value = Math.max(0.10, Math.round(suggested * 100) / 100).toFixed(2);
-  updateCLI();
 }
 
 // ══════════════════════════════════════════════════════════
