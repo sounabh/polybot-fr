@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Polymarket AI Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050709;--s1:#090d12;--s2:#0d1219;--s3:#121921;
+  --b1:#1a2535;--b2:#243045;
+  --teal:#14b8a6;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#a855f7;--blue:#3b82f6;
+  --text:#e2ecf5;--t2:#8ba3b8;--t3:#4d6478;
+  --mono:'JetBrains Mono',monospace;--body:'Space Grotesk',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;}
+::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:var(--s1);}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+
+/* HEADER */
+.hdr{position:sticky;top:0;z-index:300;display:flex;align-items:center;justify-content:space-between;height:50px;padding:0 20px;background:rgba(5,7,9,.96);border-bottom:1px solid var(--b1);backdrop-filter:blur(16px);}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal);}
+.srv-dot{width:7px;height:7px;border-radius:50%;background:var(--t3);transition:.3s;}
+.srv-dot.on{background:var(--green);box-shadow:0 0 6px var(--green);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.wallet-info{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t3);}
+.wallet-info.on{color:var(--teal);border-color:rgba(20,184,166,.3);}
+
+/* NAV */
+#nav{display:flex;align-items:center;gap:2px;padding:0 14px;height:40px;background:var(--s1);border-bottom:1px solid var(--b1);overflow-x:auto;scrollbar-width:none;position:sticky;top:50px;z-index:200;}
+#nav::-webkit-scrollbar{display:none;}
+.nb{font-family:var(--body);font-size:13px;font-weight:500;padding:5px 13px;border-radius:6px;border:none;cursor:pointer;background:none;color:var(--t3);white-space:nowrap;transition:.15s;}
+.nb:hover{color:var(--text);background:rgba(255,255,255,.04);}
+.nb.active{color:var(--teal);background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.2);}
+
+/* MAIN */
+main{max-width:1480px;margin:0 auto;padding:20px;}
+.page{display:none;}.page.active{display:block;animation:fi .18s ease;}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:7px;border:none;cursor:pointer;font-family:var(--body);font-size:13px;font-weight:600;transition:.15s;white-space:nowrap;}
+.btn:disabled{opacity:.3;cursor:not-allowed;}
+.btn-primary{background:var(--teal);color:#000;}.btn-primary:hover:not(:disabled){background:#0d9488;transform:translateY(-1px);}
+.btn-success{background:rgba(34,197,94,.13);color:var(--green);border:1px solid rgba(34,197,94,.28);}
+.btn-danger {background:rgba(239,68,68,.11);color:var(--red);  border:1px solid rgba(239,68,68,.28);}
+.btn-ghost  {background:var(--s2);color:var(--t2);border:1px solid var(--b1);}
+.btn-ghost:hover:not(:disabled){border-color:var(--teal);color:var(--teal);}
+.btn-accent {background:rgba(20,184,166,.1);color:var(--teal);border:1px solid rgba(20,184,166,.22);}
+.btn-amber  {background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.25);}
+.btn-yes    {background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.22);flex:1;}
+.btn-no     {background:rgba(239,68,68,.09);color:var(--red);border:1px solid rgba(239,68,68,.22);flex:1;}
+.btn-sm{padding:5px 11px;font-size:12px;border-radius:5px;}
+.full{width:100%;}
+
+/* CARDS */
+.card{background:var(--s2);border:1px solid var(--b1);border-radius:10px;padding:18px;}
+.ctitle{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.mb12{margin-bottom:12px;}.mb16{margin-bottom:16px;}.mt16{margin-top:16px;}.mt10{margin-top:10px;}
+
+/* STAT GRIDS */
+.sg6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px;}
+.sg4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.sc{background:var(--s2);border:1px solid var(--b1);border-radius:10px;padding:14px;}
+.sl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;}
+.sv{font-family:var(--mono);font-size:20px;font-weight:600;line-height:1;}
+
+/* TABLES */
+.tscroll{overflow-x:auto;}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+.tbl thead tr{border-bottom:1px solid var(--b1);}
+.tbl th{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);padding:9px 11px;text-align:left;white-space:nowrap;}
+.tbl td{padding:9px 11px;border-bottom:1px solid rgba(26,37,53,.5);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.012);}
+.cl{max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cll{max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* CHIPS / BADGES */
+.chip{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.04em;text-transform:uppercase;}
+.chip-yes{background:rgba(34,197,94,.13);color:var(--green);}
+.chip-no{background:rgba(239,68,68,.11);color:var(--red);}
+.chip-buy{background:rgba(20,184,166,.1);color:var(--teal);}
+.chip-sell{background:rgba(245,158,11,.1);color:var(--amber);}
+.chip-sim{background:rgba(168,85,247,.12);color:var(--purple);}
+.chip-live{background:rgba(34,197,94,.13);color:var(--green);}
+.bdg{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;}
+.bdg-exc{background:rgba(34,197,94,.13);color:var(--green);}
+.bdg-good{background:rgba(20,184,166,.1);color:var(--teal);}
+.bdg-fair{background:rgba(245,158,11,.1);color:var(--amber);}
+.bdg-poor{background:rgba(239,68,68,.11);color:var(--red);}
+
+/* MARKET GRID */
+#mkt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;}
+.mc{background:var(--s2);border:1px solid var(--b1);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;}
+.mc:hover{border-color:rgba(20,184,166,.3);transform:translateY(-2px);}
+.mc-img{width:100%;height:85px;object-fit:cover;}
+.mc-ph{width:100%;height:55px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--s3);}
+.mc-body{padding:12px;}
+.mc-tags{margin-bottom:5px;display:flex;gap:4px;flex-wrap:wrap;}
+.tag{background:rgba(20,184,166,.08);color:var(--teal);border-radius:3px;padding:2px 6px;font-size:10px;font-family:var(--mono);}
+.mc-title{font-size:13px;font-weight:500;line-height:1.42;margin-bottom:8px;min-height:34px;}
+.mc-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:5px;}
+.mc-end{color:var(--t3);font-size:10px;margin-bottom:8px;}
+.mc-btns{display:flex;gap:7px;margin-top:8px;}
+.prob-row{display:flex;justify-content:space-between;margin-bottom:4px;font-family:var(--mono);font-size:12px;font-weight:700;}
+.pb{height:5px;background:rgba(239,68,68,.2);border-radius:3px;overflow:hidden;margin-bottom:7px;}
+.pb-f{height:100%;background:linear-gradient(90deg,var(--green),var(--teal));border-radius:3px;}
+
+/* CATEGORY TABS */
+.cat-sc{overflow-x:auto;scrollbar-width:none;margin-bottom:14px;}
+.cat-sc::-webkit-scrollbar{display:none;}
+#cat-tabs{display:flex;gap:7px;padding:2px 0;}
+.cat-tab{display:flex;align-items:center;gap:5px;white-space:nowrap;padding:6px 13px;border-radius:18px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-size:13px;font-weight:500;transition:.15s;}
+.cat-tab:hover{border-color:var(--teal);color:var(--text);}
+.cat-tab.active{background:rgba(20,184,166,.08);border-color:rgba(20,184,166,.35);color:var(--teal);font-weight:600;}
+
+/* TRADE PANEL */
+#tp{position:fixed;right:0;top:90px;height:calc(100vh - 90px);width:310px;background:var(--s1);border-left:1px solid var(--b1);z-index:400;padding:18px;display:flex;flex-direction:column;gap:11px;overflow-y:auto;}
+.tp-x{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;}
+.tp-x:hover{color:var(--text);}
+.tp-market{font-size:12.5px;font-weight:500;line-height:1.4;color:var(--t2);}
+.ob{font-family:var(--mono);font-size:20px;font-weight:700;}
+.ob.yes{color:var(--green);}.ob.no{color:var(--red);}.ob.sell{color:var(--amber);}
+.tp-prob-txt{font-family:var(--mono);font-size:11px;color:var(--t3);}
+.pw{font-size:12px;font-weight:600;padding:6px 10px;border-radius:6px;}
+.pw.green{background:rgba(34,197,94,.09);color:var(--green);}
+.pw.amber{background:rgba(245,158,11,.09);color:var(--amber);}
+.pw.red{background:rgba(239,68,68,.09);color:var(--red);}
+.tp-in{width:100%;background:var(--bg);border:1px solid var(--b1);border-radius:7px;padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:15px;outline:none;}
+.tp-in:focus{border-color:var(--teal);}
+#tp-presets{display:flex;gap:5px;flex-wrap:wrap;}
+.preset-btn{font-family:var(--mono);font-size:10px;padding:4px 9px;border-radius:5px;border:1px solid var(--b1);background:var(--s3);color:var(--t2);cursor:pointer;transition:.15s;}
+.preset-btn:hover{border-color:var(--teal);color:var(--teal);}
+.cli-box{background:var(--bg);border:1px solid var(--b1);border-radius:7px;padding:10px 12px;}
+.cli-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase;}
+.cli-cmd{font-family:var(--mono);font-size:11px;color:var(--teal);word-break:break-all;cursor:pointer;user-select:all;}
+.cli-cmd:hover{color:#5eead4;}
+
+/* MODAL */
+#modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;}
+#modal-overlay.hidden{display:none;}
+.modal-box{background:var(--s2);border:1px solid var(--b2);border-radius:14px;padding:24px;width:100%;max-width:500px;max-height:82vh;overflow-y:auto;position:relative;}
+.modal-x{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:10px;line-height:1.3;}
+.modal-desc{font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.5;}
+.modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;}
+.modal-stats>div{background:var(--s3);border-radius:7px;padding:9px;}
+.modal-btns{display:flex;flex-direction:column;gap:8px;}
+
+/* AI CHAT */
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 160px);max-height:660px;}
+.chat-qps{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
+.qp-btn{font-size:12px;padding:5px 11px;border-radius:14px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;transition:.15s;}
+.qp-btn:hover{border-color:var(--teal);color:var(--teal);}
+#chat-msgs{flex:1;overflow-y:auto;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.cmsg{display:flex;}
+.cmsg.user{justify-content:flex-end;}
+.cbub{max-width:82%;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.6;}
+.cmsg.user .cbub{background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.18);border-bottom-right-radius:3px;}
+.cmsg.assistant .cbub{background:var(--s2);border:1px solid var(--b1);border-bottom-left-radius:3px;}
+.cbub code{background:rgba(20,184,166,.1);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px;color:var(--teal);}
+.cbub blockquote{border-left:2px solid var(--teal);padding-left:9px;color:var(--teal);margin:6px 0;font-size:12px;}
+.chat-acts{display:flex;gap:7px;margin-top:9px;}
+.chat-row{display:flex;gap:8px;margin-top:9px;}
+#chat-in{flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:10px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;resize:none;height:42px;}
+#chat-in:focus{border-color:var(--teal);}
+.dots{display:flex;gap:4px;align-items:center;height:18px;}
+.dots span{width:5px;height:5px;border-radius:50%;background:var(--t3);animation:dot .8s infinite;}
+.dots span:nth-child(2){animation-delay:.15s;}.dots span:nth-child(3){animation-delay:.3s;}
+@keyframes dot{0%,80%,100%{opacity:.3}40%{opacity:1;transform:translateY(-3px)}}
+
+/* BOT */
+.bot-dot{width:9px;height:9px;border-radius:50%;background:var(--t3);display:inline-block;}
+.bot-dot.on{background:var(--green);box-shadow:0 0 6px var(--green);}
+.log-box{background:var(--bg);border:1px solid var(--b1);border-radius:7px;padding:12px;max-height:260px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.9;}
+.lr{display:flex;gap:11px;}
+.lts{color:var(--teal);opacity:.4;flex-shrink:0;}
+
+/* FORMS */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.fg label{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);}
+.fg input,.fg select{background:var(--bg);border:1px solid var(--b1);border-radius:7px;padding:9px 12px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;transition:border-color .15s;}
+.fg input:focus,.fg select:focus{border-color:var(--teal);}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+/* NOTICES */
+.notice{border-radius:7px;padding:11px 14px;font-size:12.5px;line-height:1.5;margin-bottom:12px;}
+.notice.info{background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.18);color:rgba(20,184,166,.9);}
+.notice.warn{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);color:var(--amber);}
+.notice.err{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);color:var(--red);}
+.notice.ok{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.18);color:var(--green);}
+
+/* MISC */
+.sp{width:17px;height:17px;border:2px solid var(--b2);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;display:inline-block;}
+.sp-sm{width:12px;height:12px;border-width:2px;border-top-color:#000;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ldr{display:flex;align-items:center;gap:9px;color:var(--t3);padding:18px 0;}
+.empty{color:var(--t3);padding:14px 0;font-size:13px;}
+.up{color:var(--green)!important;}.dn{color:var(--red)!important;}
+.mt{color:var(--t3)!important;}.fw{font-weight:700;}.sm{font-size:11px;}.mono{font-family:var(--mono);}
+.hidden{display:none!important;}
+.txl{color:var(--teal);font-family:var(--mono);font-size:11px;text-decoration:none;}
+.txl:hover{text-decoration:underline;}
+.srch-row{display:flex;gap:9px;margin-bottom:12px;}
+.srch-in{flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:8px 13px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;}
+.srch-in:focus{border-color:var(--teal);}
+.profile-hero{display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px;background:var(--s2);border:1px solid var(--b1);border-radius:10px;flex-wrap:wrap;}
+.av{width:56px;height:56px;border-radius:50%;border:2px solid var(--teal);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--s3);}
+.av img{width:100%;height:100%;object-fit:cover;}
+.av-l{font-size:24px;font-weight:700;color:var(--teal);}
+.pf-name{font-size:20px;font-weight:700;}.pf-addr{color:var(--t3);}.pf-bio{font-size:13px;color:var(--t2);margin-top:4px;}
+.rn{font-family:var(--mono);font-size:15px;}
+.tc{display:flex;align-items:center;gap:9px;}
+.tav,.tav-ph{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;}
+.tav-ph{background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--teal);}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--s2);border:1px solid var(--b2);padding:10px 18px;border-radius:7px;font-size:13px;font-weight:600;z-index:9999;transition:.3s;opacity:0;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+#toast.ok{border-color:rgba(34,197,94,.35);color:var(--green);}
+#toast.err{border-color:rgba(239,68,68,.35);color:var(--red);}
+#toast.warn{border-color:rgba(245,158,11,.28);color:var(--amber);}
+
+/* RISK PANEL */
+.risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.risk-card{background:var(--s3);border:1px solid var(--b1);border-radius:8px;padding:12px;}
+
+/* RESPONSIVE */
+@media(max-width:1024px){.sg6,.sg4{grid-template-columns:repeat(3,1fr)}.three-col{grid-template-columns:1fr 1fr}.risk-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){main{padding:12px}.sg6,.sg4{grid-template-columns:1fr 1fr}.two-col,.three-col{grid-template-columns:1fr}#tp{width:100%;top:auto;bottom:0;height:auto;max-height:65vh;border-left:none;border-top:1px solid var(--b1);}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">🎯 POLYMARKET BOT <div class="srv-dot" id="srv-dot"></div></div>
+  <div class="hdr-r">
+    <span class="wallet-info" id="wallet-info">connecting…</span>
+  </div>
+</header>
+
+<nav id="nav">
+  <button class="nb active" data-p="dash"       onclick="nav('dash')">Dashboard</button>
+  <button class="nb"        data-p="profile"    onclick="nav('profile')">Profile</button>
+  <button class="nb"        data-p="markets"    onclick="nav('markets')">Markets</button>
+  <button class="nb"        data-p="ai"         onclick="nav('ai')">🤖 AI Trade</button>
+  <button class="nb"        data-p="lb"         onclick="nav('lb')">Leaderboard</button>
+  <button class="nb"        data-p="trades"     onclick="nav('trades')">My Trades</button>
+  <button class="nb"        data-p="bot"        onclick="nav('bot')">Auto Bot</button>
+  <button class="nb"        data-p="bullpen"    onclick="nav('bullpen')">📟 Bullpen</button>
+  <button class="nb"        data-p="settings"   onclick="nav('settings')">⚙ Settings</button>
+</nav>
+
+<!-- TRADE PANEL (slides in from right) -->
+<div id="tp" class="hidden">
+  <button class="tp-x" onclick="closeTP()">✕</button>
+  <div class="ctitle" id="tp-mode-lbl">BUY ORDER</div>
+  <div class="tp-market" id="tp-title"></div>
+  <div style="display:flex;align-items:center;gap:9px">
+    <span class="ob" id="tp-outcome"></span>
+    <span class="tp-prob-txt" id="tp-prob-txt"></span>
+  </div>
+  <div class="pw" id="tp-warn"></div>
+  <input type="hidden" id="tp-market">
+  <input type="hidden" id="tp-slug">
+  <input type="hidden" id="tp-side">
+  <div class="fg">
+    <label id="tp-amt-lbl">Amount (USDC)</label>
+    <input class="tp-in" type="number" id="tp-amt" min="0.10" step="0.10" placeholder="Enter amount…" oninput="onAmtChange()">
+  </div>
+  <div id="tp-presets"></div>
+  <div class="sm mt" id="tp-bal-line"></div>
+  <button class="btn btn-primary full" id="tp-btn" onclick="submitTrade()">Place Order via Server</button>
+  <div id="tp-result"></div>
+  <div class="cli-box">
+    <div class="cli-lbl">📟 Bullpen CLI command</div>
+    <div class="cli-cmd" id="tp-cli" onclick="copyCLI()" title="Click to copy"></div>
+    <div style="font-size:9px;color:var(--t3);margin-top:4px">Click to copy · Run in your terminal</div>
+  </div>
+</div>
+
+<!-- MARKET MODAL -->
+<div id="modal-overlay" class="hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<main>
+
+<!-- DASHBOARD -->
+<div id="p-dash" class="page active">
+  <div class="sg6" id="dash-stats">
+    <div class="sc"><div class="sl">BALANCE</div><div class="sv up" id="d-bal">—</div></div>
+    <div class="sc"><div class="sl">REALIZED P&L</div><div class="sv" id="d-rp">—</div></div>
+    <div class="sc"><div class="sl">UNREALIZED P&L</div><div class="sv" id="d-up">—</div></div>
+    <div class="sc"><div class="sl">POSITIONS</div><div class="sv" id="d-pos">—</div></div>
+    <div class="sc"><div class="sl">TODAY TRADES</div><div class="sv" id="d-today">—</div></div>
+    <div class="sc"><div class="sl">SESSION P&L</div><div class="sv" id="d-spnl">—</div></div>
+  </div>
+  <div class="two-col mb16">
+    <div class="card"><div class="ctitle mb12">OPEN POSITIONS</div><div id="d-pos-tbl"><div class="ldr"><div class="sp"></div><span>Loading…</span></div></div></div>
+    <div class="card"><div class="ctitle mb12">RECENT TRADES</div><div id="d-trades-tbl"><div class="ldr"><div class="sp"></div><span>Loading…</span></div></div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle mb10">BOT & RISK STATUS</div>
+    <div id="d-bot-status"><div class="ldr"><div class="sp"></div><span>Loading…</span></div></div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div id="p-profile" class="page">
+  <div id="profile-content"><div class="ldr"><div class="sp"></div><span>Loading profile…</span></div></div>
+</div>
+
+<!-- MARKETS -->
+<div id="p-markets" class="page">
+  <div class="srch-row">
+    <input class="srch-in" id="mkt-search" type="text" placeholder="Search any market…" oninput="filterMarkets()">
+    <button class="btn btn-ghost" onclick="filterMarkets()">↻</button>
+  </div>
+  <div class="cat-sc"><div id="cat-tabs"></div></div>
+  <div id="mkt-grid"><div class="ldr"><div class="sp"></div><span>Loading markets…</span></div></div>
+</div>
+
+<!-- AI TRADE -->
+<div id="p-ai" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div><div class="ctitle">AI TRADING ASSISTANT</div><div class="sm mt">Ask in plain English — AI analyzes & suggests, you confirm to place</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="clearChat()">Clear</button>
+  </div>
+  <div class="chat-qps">
+    <button class="qp-btn" onclick="qp('Show me today\'s IPL cricket markets')">🏏 IPL</button>
+    <button class="qp-btn" onclick="qp('Find Bitcoin prediction markets')">₿ Crypto</button>
+    <button class="qp-btn" onclick="qp('Show US election markets')">🏛️ Politics</button>
+    <button class="qp-btn" onclick="qp('What is the best $1 bet right now?')">💡 Best $1</button>
+    <button class="qp-btn" onclick="qp('Show high probability sports markets')">⚽ Sports</button>
+    <button class="qp-btn" onclick="qp('I have $2, what should I bet on?')">🎯 $2 balance</button>
+  </div>
+  <div class="chat-wrap">
+    <div id="chat-msgs"></div>
+    <div class="chat-row">
+      <textarea id="chat-in" placeholder="e.g. 'Buy $1 on Mumbai Indians winning IPL 2025'…"></textarea>
+      <button class="btn btn-primary" onclick="sendChat()">Send →</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="p-lb" class="page">
+  <div class="notice info mb16">Click <strong>View Trades</strong> to see a trader's recent bets and copy them. Click <strong>Follow</strong> to get alerts when they trade.</div>
+  <div id="lb-content"><div class="ldr"><div class="sp"></div><span>Loading leaderboard…</span></div></div>
+</div>
+
+<!-- MY TRADES -->
+<div id="p-trades" class="page">
+  <div class="card"><div class="ctitle mb12">COMPLETE TRADE HISTORY</div><div id="trades-content"><div class="ldr"><div class="sp"></div></div></div></div>
+</div>
+
+<!-- AUTO BOT -->
+<div id="p-bot" class="page">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div class="bot-dot" id="bot-dot"></div>
+    <span id="bot-lbl" style="font-size:16px;font-weight:700;letter-spacing:.04em">STOPPED</span>
+    <span id="bot-cycle" class="sm mt"></span>
+  </div>
+
+  <!-- Risk metrics row -->
+  <div class="risk-grid" id="risk-metrics">
+    <div class="risk-card"><div class="sl">TODAY</div><div class="sv mono" id="r-today">0/4</div></div>
+    <div class="risk-card"><div class="sl">SESSION P&L</div><div class="sv mono" id="r-spnl">$0.00</div></div>
+    <div class="risk-card"><div class="sl">WIN RATE</div><div class="sv mono" id="r-wr">—</div></div>
+    <div class="risk-card"><div class="sl">EXPOSURE</div><div class="sv mono" id="r-exp">$0.00</div></div>
+  </div>
+
+  <div class="two-col mb16">
+    <div class="card">
+      <div class="ctitle mb16">BOT CONFIGURATION</div>
+      <div class="fg2">
+        <div class="fg"><label>Daily Limit</label><input type="number" id="b-daily" min="1" max="20" value="4"></div>
+        <div class="fg"><label>Max Budget % / trade</label><input type="number" id="b-budget" min="5" max="50" value="20"></div>
+      </div>
+      <div class="fg2">
+        <div class="fg"><label>Max Exposure %</label><input type="number" id="b-exposure" min="10" max="90" value="60"></div>
+        <div class="fg"><label>Stop-loss %</label><input type="number" id="b-stoploss" min="10" max="90" value="50"></div>
+      </div>
+      <div class="fg2">
+        <div class="fg"><label>Min AI Score (0-100)</label><input type="number" id="b-score" min="30" max="90" value="55"></div>
+        <div class="fg"><label>Execution</label>
+          <select id="b-exec">
+            <option value="clob">CLOB v2 (default)</option>
+            <option value="bullpen">Bullpen CLI</option>
+          </select>
+        </div>
+      </div>
+      <div class="notice warn" style="font-size:11px;margin-bottom:14px">
+        Checks markets every 15 min · Kelly sizing · Stop-loss monitored per position · Consecutive loss circuit breaker (3 losses = pause)
+      </div>
+      <div style="display:flex;gap:9px">
+        <button class="btn btn-success" id="bot-start" onclick="startBot()" style="flex:1">▶ Start Bot</button>
+        <button class="btn btn-danger"  id="bot-stop"  onclick="stopBot()"  style="flex:1" disabled>■ Stop Bot</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle mb12">RISK RULES</div>
+      <div style="font-size:12.5px;color:var(--t2);line-height:2.2">
+        <div>📊 <strong style="color:var(--text)">Per-trade budget</strong> — capped % of balance (Kelly)</div>
+        <div>📉 <strong style="color:var(--text)">Max exposure</strong> — total % held in positions</div>
+        <div>🛑 <strong style="color:var(--text)">Stop-loss</strong> — auto-sell if position loses set %</div>
+        <div>⛔ <strong style="color:var(--text)">Circuit breaker</strong> — pauses after 3 losses in a row</div>
+        <div>📅 <strong style="color:var(--text)">Daily limit</strong> — max N trades per calendar day</div>
+        <div>🧮 <strong style="color:var(--text)">½ Kelly sizing</strong> — risk-adjusted position size</div>
+      </div>
+      <div class="ctitle mt16 mb10">ADD TARGET MARKET</div>
+      <div style="display:flex;gap:8px">
+        <input class="srch-in" id="target-id" placeholder="Condition ID (0x…)" style="flex:1;padding:8px 10px;font-size:12px">
+        <button class="btn btn-accent btn-sm" onclick="addTarget()">Add</button>
+      </div>
+      <div id="target-list" class="mt10 sm mt"></div>
+    </div>
+  </div>
+
+  <div class="card mb16">
+    <div class="ctitle mb10">LIVE LOG</div>
+    <div class="log-box" id="bot-log"><span class="sm mt">Not started…</span></div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle mb12">BOT TRADES THIS SESSION</div>
+    <div id="bot-trades"><div class="empty">No auto-trades yet</div></div>
+  </div>
+</div>
+
+<!-- BULLPEN -->
+<div id="p-bullpen" class="page">
+  <div id="bp-status-bar" class="notice info mb16">Checking Bullpen CLI…</div>
+
+  <!-- Skill status card -->
+  <div class="card mb16" id="bp-skill-card">
+    <div class="ctitle mb10">🤖 AI SKILL STATUS</div>
+    <div id="bp-skill-status" class="ldr"><div class="sp"></div><span>Checking…</span></div>
+  </div>
+
+  <div class="two-col mb16">
+    <div class="card">
+      <div class="ctitle mb12">QUICK COMMANDS</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-ghost full" onclick="bpRun('balances')">💰 Show Balances</button>
+        <button class="btn btn-ghost full" onclick="bpRun('positions')">📊 Show Positions</button>
+        <button class="btn btn-ghost full" onclick="bpRun('orders')">📋 Show Open Orders</button>
+        <button class="btn btn-ghost full" onclick="bpRun('leaderboard')">🏆 Leaderboard</button>
+        <button class="btn btn-ghost full" onclick="bpRun('feed')">📡 Trade Feed</button>
+        <button class="btn btn-ghost full" onclick="bpRun('discover')">🔍 Discover Markets</button>
+        <button class="btn btn-danger full" onclick="bpRun('cancel')">✕ Cancel All Orders</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle mb12">SEARCH MARKETS</div>
+      <div class="fg"><label>Search query</label>
+        <div style="display:flex;gap:8px">
+          <input id="bp-search-q" class="srch-in" placeholder="IPL cricket, bitcoin…" style="flex:1">
+          <button class="btn btn-primary" onclick="bpSearch()">Search</button>
+        </div>
+      </div>
+      <div class="ctitle mt16 mb10">GET MARKET PRICE</div>
+      <div style="display:flex;gap:8px">
+        <input id="bp-price-slug" class="srch-in" placeholder="market-slug" style="flex:1">
+        <button class="btn btn-accent" onclick="bpPrice()">Price</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle mb10">BULLPEN OUTPUT</div>
+    <div class="log-box" id="bp-output" style="max-height:380px"><span class="sm mt">Run a command above…</span></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="p-settings" class="page">
+  <div style="max-width:600px">
+    <div class="card mb16">
+      <div class="ctitle mb12">👤 YOUR ACCOUNT</div>
+      <div id="settings-account"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="card mb16">
+      <div class="ctitle mb16">🤖 CLAUDE AI KEY</div>
+      <div class="notice info mb12" style="font-size:12px">
+        Required for full AI market analysis in the AI Trade tab.
+        Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--teal)">console.anthropic.com</a> (~$0.003/message)
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="ck-input" class="srch-in" placeholder="sk-ant-api03-…" style="flex:1">
+        <button class="btn btn-primary" onclick="saveClaudeKey()">Save</button>
+      </div>
+    </div>
+    <div class="card mb16">
+      <div class="ctitle mb12">⚙ RISK CONFIGURATION</div>
+      <div class="fg3">
+        <div class="fg"><label>Daily Limit</label><input type="number" id="s-daily" min="1" max="20" value="4"></div>
+        <div class="fg"><label>Budget % / Trade</label><input type="number" id="s-budget" min="5" max="50" value="20"></div>
+        <div class="fg"><label>Max Exposure %</label><input type="number" id="s-exposure" min="10" max="90" value="60"></div>
+        <div class="fg"><label>Stop-loss %</label><input type="number" id="s-stoploss" min="10" max="90" value="50"></div>
+        <div class="fg"><label>Min AI Score</label><input type="number" id="s-score" min="30" max="90" value="55"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveRisk()">Save Risk Settings</button>
+    </div>
+    <div class="card">
+      <div class="ctitle mb12">🌐 SERVER INFO</div>
+      <div id="srv-info" style="font-size:12.5px;color:var(--t2);line-height:2.3">Loading…</div>
+    </div>
+  </div>
+</div>
+
+</main>
+<div id="toast"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
