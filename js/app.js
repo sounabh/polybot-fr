@@ -4,7 +4,7 @@
  * No direct Polymarket API calls from the browser — everything goes through the server.
  */
 
-const API_BASE = '';  // Same origin — server serves this file
+const API_BASE = 'https://polybot-bc.onrender.com';  // Same origin — server serves this file
 
 // ── State ─────────────────────────────────────────────────
 const App = {
