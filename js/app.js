@@ -4,7 +4,12 @@
  * No direct Polymarket API calls from the browser — everything goes through the server.
  */
 
-const API_BASE = 'https://polybot-bc.onrender.com';  // Same origin — server serves this file
+// When the UI is served from this app (http/https), use the same origin for /api (e.g. localhost:3001)
+const API_BASE =
+  (typeof window !== 'undefined' && window.location &&
+    (window.location.protocol === 'http:' || window.location.protocol === 'https:'))
+    ? window.location.origin
+    : '';
 
 // ── State ─────────────────────────────────────────────────
 const App = {
@@ -31,8 +36,16 @@ const ge  = id => document.getElementById(id);
 const qs  = s  => document.querySelector(s);
 const qsa = s  => document.querySelectorAll(s);
 
-const fmtUSD = (n, d=2) => { n=+(n||0); return n>=1e6?`$${(n/1e6).toFixed(1)}M`:n>=1e3?`$${(n/1e3).toFixed(1)}K`:`$${n.toFixed(d)}`; };
-const fmtPnl = n  => { n=+(n||0); return (n>=0?'+':'-')+'$'+Math.abs(n).toFixed(2); };
+const fmtUSD = (n, d=2) => {
+  const x = +(n ?? 0);
+  if (!Number.isFinite(x)) return '—';
+  return x>=1e6?`$${(x/1e6).toFixed(1)}M`:x>=1e3?`$${(x/1e3).toFixed(1)}K`:`$${x.toFixed(d)}`;
+};
+const fmtPnl = n  => {
+  const x = +(n ?? 0);
+  if (!Number.isFinite(x)) return '—';
+  return (x>=0?'+':'-')+'$'+Math.abs(x).toFixed(2);
+};
 const fmtD   = d  => { if(!d)return'—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}); };
 const fmtDT  = d  => { if(!d)return'—'; return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); };
 const sa     = a  => a?a.slice(0,6)+'…'+a.slice(-4):'—';
@@ -194,7 +207,9 @@ async function loadDash() {
   ge('d-pos').textContent  = port.posCount || 0;
 
   if (port.riskPnl) {
-    ge('d-today').textContent = `${port.riskPnl.todayTrades}/${port.riskPnl.todayTrades + port.riskPnl.dailyRemaining}`;
+    const td = port.riskPnl.todayTrades || 0;
+    const dr = port.riskPnl.dailyRemaining || 0;
+    ge('d-today').textContent = `${td}/${td + dr}`;
     const sp = port.riskPnl.realizedPnl || 0;
     ge('d-spnl').textContent  = fmtPnl(sp);
     ge('d-spnl').className    = 'sv ' + (sp >= 0 ? 'up' : 'dn');
@@ -277,7 +292,7 @@ async function loadProfile() {
     </div>
     <div class="sg6" style="margin-bottom:18px">
       <div class="sc"><div class="sl">BALANCE</div><div class="sv up">${fmtUSD(port.cashBalance)}</div></div>
-      <div class="sc"><div class="sl">PORTFOLIO VALUE</div><div class="sv">${fmtUSD(port.cashBalance+port.posValue)}</div></div>
+      <div class="sc"><div class="sl">PORTFOLIO VALUE</div><div class="sv">${fmtUSD((port.cashBalance||0)+(port.posValue||0))}</div></div>
       <div class="sc"><div class="sl">REALIZED P&L</div><div class="sv ${port.realizedPnl>=0?'up':'dn'}">${fmtPnl(port.realizedPnl)}</div></div>
       <div class="sc"><div class="sl">UNREALIZED P&L</div><div class="sv ${port.unrealizedPnl>=0?'up':'dn'}">${fmtPnl(port.unrealizedPnl)}</div></div>
       <div class="sc"><div class="sl">VOLUME</div><div class="sv">${fmtUSD(port.totalVolume)}</div></div>
@@ -403,6 +418,10 @@ function closeModal() { ge('modal-overlay').classList.add('hidden'); }
 // ══════════════════════════════════════════════════════════
 function openBuy(id, slug, title, outcome, price, pct) {
   const bal = App.portfolio?.cashBalance || 0;
+  const priceNum = parseFloat(price);
+  let probPct = Number.isFinite(parseFloat(pct)) ? Math.round(parseFloat(pct)) : Math.round((Number.isFinite(priceNum) ? priceNum : 0.5) * 100);
+  if (!Number.isFinite(probPct) || probPct < 0 || probPct > 100) probPct = Math.round((Number.isFinite(priceNum) ? priceNum : 0.5) * 100);
+
   ge('tp-market').value = id;
   ge('tp-slug').value   = slug;
   ge('tp-side').value   = 'buy';
@@ -410,15 +429,16 @@ function openBuy(id, slug, title, outcome, price, pct) {
   ge('tp-title').textContent    = title;
   ge('tp-outcome').textContent  = outcome;
   ge('tp-outcome').className    = `ob ${outcome.toLowerCase()}`;
-  ge('tp-prob-txt').textContent = `${pct}% probability · $${parseFloat(price).toFixed(3)}/share`;
+  ge('tp-prob-txt').textContent = `~${probPct}% implied · $${Number.isFinite(priceNum)?priceNum.toFixed(3):'—'}/share`;
   ge('tp-amt-lbl').textContent  = 'Amount (USDC to spend)';
   ge('tp-btn').textContent      = 'Place Order via Server';
   ge('tp-btn').onclick          = submitTrade;
 
-  // Probability warning
-  if (pct < 25)       { ge('tp-warn').textContent = `⚠️ HIGH RISK: only ${pct}% chance — likely to lose`; ge('tp-warn').className = 'pw red'; }
-  else if (pct < 50)  { ge('tp-warn').textContent = `⚠️ Underdog bet — ${pct}% probability`; ge('tp-warn').className = 'pw amber'; }
-  else                { ge('tp-warn').textContent = `✅ ${pct}% probability — favoured outcome`; ge('tp-warn').className = 'pw green'; }
+  // Probability warning — implied chance this outcome wins (the side you clicked)
+
+  if (probPct < 25)       { ge('tp-warn').textContent = `⚠️ HIGH RISK: only ~${probPct}% implied — long-shot`; ge('tp-warn').className = 'pw red'; }
+  else if (probPct < 50)  { ge('tp-warn').textContent = `⚠️ Underdog — ~${probPct}% implied`; ge('tp-warn').className = 'pw amber'; }
+  else                      { ge('tp-warn').textContent = `✅ ~${probPct}% implied — higher consensus`; ge('tp-warn').className = 'pw green'; }
 
   ge('tp-bal-line').textContent = bal > 0 ? `Balance: $${bal.toFixed(2)} USDC` : '⚠️ No balance — fund wallet';
 
@@ -500,8 +520,9 @@ async function submitTrade() {
   }
 
   // Final confirmation
-  const pct = ge('tp-prob-txt').textContent.split('%')[0];
-  if (!confirm(`CONFIRM ORDER\n\n${ge('tp-title').textContent}\nBuy: ${outcome} (${pct}% probability)\nAmount: $${amt.toFixed(2)} USDC\n\nClick OK to submit.`)) return;
+  const pm = ge('tp-prob-txt').textContent.match(/(\d+)%/);
+  const pct = pm ? pm[1] : '—';
+  if (!confirm(`CONFIRM ORDER\n\n${ge('tp-title').textContent}\nBuy: ${outcome} (~${pct}% implied)\nAmount: $${amt.toFixed(2)} USDC\n\nClick OK to submit.`)) return;
 
   btn.disabled = true; btn.innerHTML = `<div class="sp sp-sm"></div> Placing order…`;
   ge('tp-result').innerHTML = '';
