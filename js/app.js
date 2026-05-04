@@ -4,12 +4,25 @@
  * No direct Polymarket API calls from the browser — everything goes through the server.
  */
 
-// Same-origin when UI is served by this server. Override: <script>window.POLY_API_BASE='https://host'</script> before this file.
-const API_BASE = (typeof window !== 'undefined' && window.POLY_API_BASE) ||
-  ((typeof window !== 'undefined' && window.location &&
-    (window.location.protocol === 'http:' || window.location.protocol === 'https:'))
-    ? window.location.origin
-    : '');
+/**
+ * Where /api/* lives. Static hosts (Vercel, etc.) have no API — must point at your Node server.
+ * Priority: window.POLY_API_BASE → localhost (same tab) → *.onrender.com (same app) → meta poly-api-base → REMOTE_API_DEFAULT
+ */
+const REMOTE_API_DEFAULT = 'https://polybot-bc.onrender.com';
+
+function getPolyApiBase() {
+  if (typeof window === 'undefined') return '';
+  if (window.POLY_API_BASE) return String(window.POLY_API_BASE).replace(/\/$/, '');
+  const { protocol, hostname, origin } = window.location;
+  if (protocol !== 'http:' && protocol !== 'https:') return REMOTE_API_DEFAULT;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return origin;
+  if (/\.onrender\.com$/i.test(hostname)) return origin;
+  const meta = document.querySelector('meta[name="poly-api-base"]')?.getAttribute('content')?.trim();
+  if (meta) return meta.replace(/\/$/, '');
+  return REMOTE_API_DEFAULT;
+}
+
+const API_BASE = getPolyApiBase();
 
 // ── State ─────────────────────────────────────────────────
 const App = {
@@ -20,6 +33,22 @@ const App = {
 };
 
 // ── API helper ────────────────────────────────────────────
+function normalizeHttpError(text, status, data) {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    if (typeof data.error === 'string') return data.error;
+    if (data.error && typeof data.error === 'object') {
+      return data.error.message || data.error.code || JSON.stringify(data.error);
+    }
+    if (data.message) return data.message;
+    if (data.detail) return data.detail;
+  }
+  const blob = `${text || ''} ${JSON.stringify(data || {})}`;
+  if (/NOT_FOUND/i.test(blob) || status === 404) {
+    return `API not found (tried ${API_BASE}). If the UI is on Vercel/Netlify, your Node API is elsewhere: set <meta name="poly-api-base" content="https://your-render-service.onrender.com"> or \`window.POLY_API_BASE\` before loading this script.`;
+  }
+  return text?.slice(0, 200) || `HTTP ${status}`;
+}
+
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
@@ -32,19 +61,18 @@ async function api(path, method = 'GET', body = null) {
       try {
         data = JSON.parse(text);
       } catch {
+        if (!r.ok) return { error: normalizeHttpError(text, r.status, null) };
         return { error: text.slice(0, 120) || `HTTP ${r.status}` };
       }
     }
-    if (!r.ok && data.error == null && data.message == null) {
-      data.error = typeof data === 'object' && data !== null && !Array.isArray(data)
-        ? (data.detail || `HTTP ${r.status}`)
-        : `HTTP ${r.status}`;
+    if (!r.ok) {
+      return { error: normalizeHttpError(text, r.status, data) };
     }
     return data;
   } catch (e) {
     return {
       error: e.message || 'Network error',
-      hint: !API_BASE ? 'Open the app via http://localhost:3001 (same server as the API), or set window.POLY_API_BASE.' : null,
+      hint: 'Check API URL (poly-api-base / POLY_API_BASE) and CORS on your Node server.',
     };
   }
 }
