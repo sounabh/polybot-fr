@@ -252,7 +252,6 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
   <button class="nb"        data-p="lb"         onclick="nav('lb')">Leaderboard</button>
   <button class="nb"        data-p="trades"     onclick="nav('trades')">My Trades</button>
   <button class="nb"        data-p="bot"        onclick="nav('bot')">Auto Bot</button>
-  <button class="nb"        data-p="bullpen"    onclick="nav('bullpen')">📟 Bullpen</button>
   <button class="nb"        data-p="settings"   onclick="nav('settings')">⚙ Settings</button>
 </nav>
 
@@ -278,9 +277,9 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
   <button class="btn btn-primary full" id="tp-btn" onclick="submitTrade()">Place Order via Server</button>
   <div id="tp-result"></div>
   <div class="cli-box">
-    <div class="cli-lbl">📟 Bullpen CLI command</div>
+    <div class="cli-lbl">Order reference</div>
     <div class="cli-cmd" id="tp-cli" onclick="copyCLI()" title="Click to copy"></div>
-    <div style="font-size:9px;color:var(--t3);margin-top:4px">Click to copy · Run in your terminal</div>
+    <div style="font-size:9px;color:var(--t3);margin-top:4px">Market id / slug · Orders execute via server (CLOB v2)</div>
   </div>
 </div>
 
@@ -392,12 +391,6 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
       </div>
       <div class="fg2">
         <div class="fg"><label>Min AI Score (0-100)</label><input type="number" id="b-score" min="30" max="90" value="55"></div>
-        <div class="fg"><label>Execution</label>
-          <select id="b-exec">
-            <option value="clob">CLOB v2 (default)</option>
-            <option value="bullpen">Bullpen CLI</option>
-          </select>
-        </div>
       </div>
       <div class="notice warn" style="font-size:11px;margin-bottom:14px">
         Checks markets every 15 min · Kelly sizing · Stop-loss monitored per position · Consecutive loss circuit breaker (3 losses = pause)
@@ -434,50 +427,6 @@ main{max-width:1480px;margin:0 auto;padding:20px;}
   <div class="card">
     <div class="ctitle mb12">BOT TRADES THIS SESSION</div>
     <div id="bot-trades"><div class="empty">No auto-trades yet</div></div>
-  </div>
-</div>
-
-<!-- BULLPEN -->
-<div id="p-bullpen" class="page">
-  <div id="bp-status-bar" class="notice info mb16">Checking Bullpen CLI…</div>
-
-  <!-- Skill status card -->
-  <div class="card mb16" id="bp-skill-card">
-    <div class="ctitle mb10">🤖 AI SKILL STATUS</div>
-    <div id="bp-skill-status" class="ldr"><div class="sp"></div><span>Checking…</span></div>
-  </div>
-
-  <div class="two-col mb16">
-    <div class="card">
-      <div class="ctitle mb12">QUICK COMMANDS</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-ghost full" onclick="bpRun('balances')">💰 Show Balances</button>
-        <button class="btn btn-ghost full" onclick="bpRun('positions')">📊 Show Positions</button>
-        <button class="btn btn-ghost full" onclick="bpRun('orders')">📋 Show Open Orders</button>
-        <button class="btn btn-ghost full" onclick="bpRun('leaderboard')">🏆 Leaderboard</button>
-        <button class="btn btn-ghost full" onclick="bpRun('feed')">📡 Trade Feed</button>
-        <button class="btn btn-ghost full" onclick="bpRun('discover')">🔍 Discover Markets</button>
-        <button class="btn btn-danger full" onclick="bpRun('cancel')">✕ Cancel All Orders</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="ctitle mb12">SEARCH MARKETS</div>
-      <div class="fg"><label>Search query</label>
-        <div style="display:flex;gap:8px">
-          <input id="bp-search-q" class="srch-in" placeholder="IPL cricket, bitcoin…" style="flex:1">
-          <button class="btn btn-primary" onclick="bpSearch()">Search</button>
-        </div>
-      </div>
-      <div class="ctitle mt16 mb10">GET MARKET PRICE</div>
-      <div style="display:flex;gap:8px">
-        <input id="bp-price-slug" class="srch-in" placeholder="market-slug" style="flex:1">
-        <button class="btn btn-accent" onclick="bpPrice()">Price</button>
-      </div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ctitle mb10">BULLPEN OUTPUT</div>
-    <div class="log-box" id="bp-output" style="max-height:380px"><span class="sm mt">Run a command above…</span></div>
   </div>
 </div>
 

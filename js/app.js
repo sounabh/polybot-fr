@@ -175,50 +175,11 @@ async function checkStatus() {
   const si = ge('srv-info');
   if (si) si.innerHTML = `
     <div>Wallet: <span class="mono ${s.walletConnected?'up':''}">${s.walletAddress||'not configured'}</span></div>
-    <div>Bullpen CLI: <span class="${s.bullpenInstalled?'up':''}">${s.bullpenInstalled?('✅ '+s.bullpenVersion):'⚠️ not installed'}</span></div>
-    <div>Bullpen AI Skill: <span class="${s.bullpenSkill?'up':'dn'}">${s.bullpenSkill?'✅ installed (bullpen skill install ✓)':'⚠️ not installed — run: bullpen skill install'}</span></div>
+    <div>Polygon RPC: <span class="${s.polygonRpcOk===true?'up':s.polygonRpcOk===false?'dn':''}">${s.polygonRpcOk===true?'✅ on-chain balance':s.polygonRpcOk===false?'⚠️ RPC failed':'⏸ not set (set POLYGON_RPC_URL)'}</span></div>
+    <div>Data: <span class="up">Gamma + Data API + CLOB v2</span></div>
     <div>Claude AI: <span class="${s.claudeConfigured?'up':'dn'}">${s.claudeConfigured?'✅ configured':'⚠️ no key'}</span></div>
     <div>Bot: <span class="${s.bot?.running?'up':''}">${s.bot?.running?'🟢 running':'⭕ stopped'}</span></div>
     <div>Uptime: <span>${Math.round((s.uptime||0)/60)}min</span></div>`;
-
-  // Update bullpen status bar
-  const bpBar = ge('bp-status-bar');
-  if (bpBar) {
-    if (!s.bullpenInstalled) {
-      bpBar.innerHTML = `⚠️ Bullpen CLI not installed — <code>brew install bullpenfi/tap/bullpen</code> or <code>curl -fsSL https://cli.bullpen.fi/install.sh | sh</code>`;
-      bpBar.className = 'notice warn mb16';
-    } else {
-      bpBar.textContent = `✅ Bullpen ${s.bullpenVersion} installed`;
-      bpBar.className = 'notice ok mb16';
-    }
-  }
-
-  // Update skill status card
-  const sk = ge('bp-skill-status');
-  if (sk) {
-    if (!s.bullpenInstalled) {
-      sk.innerHTML = `<div class="notice warn" style="margin:0;font-size:12px">Install Bullpen CLI first, then run: <code>bullpen login</code> and <code>bullpen skill install</code></div>`;
-    } else if (!s.bullpenSkill) {
-      sk.innerHTML = `
-        <div style="font-size:13px;color:var(--t2);margin-bottom:10px">
-          <strong style="color:var(--text)">Bullpen AI Skill not installed.</strong><br>
-          Running <code>bullpen skill install</code> teaches the AI to call Bullpen commands through natural language —
-          just like the official docs describe for Claude Code.<br><br>
-          After install, our AI can:<br>
-          • "Buy $10 of Yes on will-bitcoin-hit-100k"<br>
-          • "Show me trending IPL markets"<br>
-          • "What are my open positions and P&L?"<br>
-          • "Set a limit order to sell at 65 cents"
-        </div>
-        <button class="btn btn-primary" onclick="installSkill()">Install AI Skill (bullpen skill install)</button>`;
-    } else {
-      sk.innerHTML = `
-        <div class="notice ok" style="margin:0;font-size:12px">
-          ✅ <strong>Bullpen AI Skill installed.</strong> The AI can now use Bullpen commands directly.<br>
-          Try in AI Trade tab: <em>"Buy $1 of Yes on will-bitcoin-hit-100k"</em> or <em>"Show my open positions"</em>
-        </div>`;
-    }
-  }
 }
 
 // ── Navigation ────────────────────────────────────────────
@@ -230,7 +191,7 @@ function nav(page) {
   const loaders = {
     dash: loadDash, profile: loadProfile, markets: loadMarkets,
     ai: initChat, lb: loadLB, trades: loadTrades,
-    bot: refreshBot, bullpen: loadBullpen, settings: loadSettings,
+    bot: refreshBot, settings: loadSettings,
   };
   (loaders[page] || (() => {}))();
 }
@@ -355,9 +316,11 @@ async function loadProfile() {
       <div style="flex:1">
         <div class="pf-name">${port.username || 'Anonymous'}</div>
         <div class="pf-addr mono sm" style="user-select:all">${port.address}</div>
+        ${port.tradingAddress && port.tradingAddress.toLowerCase() !== (port.address||'').toLowerCase()
+          ? `<div class="sm mt" style="opacity:.85">Trading profile: <span class="mono">${sa(port.tradingAddress)}</span></div>` : ''}
         ${port.bio?`<div class="pf-bio">${port.bio}</div>`:''}
       </div>
-      <a href="https://polymarket.com/profile/${port.address}" target="_blank" class="btn btn-ghost btn-sm">polymarket.com ↗</a>
+      <a href="https://polymarket.com/profile/${port.polymarketProfileAddress || port.tradingAddress || port.address}" target="_blank" class="btn btn-ghost btn-sm">polymarket.com ↗</a>
     </div>
     <div class="sg6" style="margin-bottom:18px">
       <div class="sc"><div class="sl">BALANCE</div><div class="sv up">${fmtUSD(port.cashBalance)}</div></div>
@@ -473,7 +436,6 @@ async function openModal(id) {
       <div><div class="sl">TOTAL VOLUME</div><div class="fw">${fmtUSD(m.volume)}</div></div>
       <div><div class="sl">ENDS</div><div class="fw">${fmtD(m.endDate)}</div></div>
     </div>
-    ${m.bullpenPrice?`<div class="notice info mb12" style="font-size:11px">📟 Bullpen: ${m.bullpenPrice}</div>`:''}
     <div class="modal-btns">
       <button class="btn btn-yes" onclick="openBuy('${m.id}','${m.slug||m.id}','${esc(m.title)}','YES',${m.yesPrice},${m.yesPct})">✅ BUY YES — ${m.yesPct}%</button>
       <button class="btn btn-no"  onclick="openBuy('${m.id}','${m.slug||m.id}','${esc(m.title)}','NO',${m.noPrice},${m.noPct})">❌ BUY NO — ${m.noPct}%</button>
@@ -558,16 +520,17 @@ function setAmt(v) { ge('tp-amt').value = parseFloat(v).toFixed(2); updateCLI();
 function onAmtChange() { updateCLI(); }
 
 function updateCLI() {
-  const slug    = ge('tp-slug').value || ge('tp-market').value;
+  const id      = ge('tp-market').value || '';
+  const slug    = ge('tp-slug').value || '';
   const outcome = ge('tp-outcome').textContent.replace('SELL: ','');
   const amt     = ge('tp-amt').value || '[amount]';
   const side    = ge('tp-side').value || 'buy';
-  ge('tp-cli').textContent = `bullpen polymarket ${side} ${slug} "${outcome}" ${amt} --yes`;
+  ge('tp-cli').textContent = `${side.toUpperCase()} ${outcome} · market ${id}${slug && slug !== id ? ` · slug ${slug}` : ''} · ${amt} USDC`;
 }
 
 function copyCLI() {
   const t = ge('tp-cli').textContent;
-  navigator.clipboard.writeText(t).then(() => toast('CLI command copied!','ok')).catch(() => {});
+  navigator.clipboard.writeText(t).then(() => toast('Copied to clipboard','ok')).catch(() => {});
 }
 
 // ── Submit BUY ─────────────────────────────────────────────
@@ -599,7 +562,6 @@ async function submitTrade() {
   const r = await api('/trade', 'POST', {
     marketId: id, slug, outcome, side: 'buy',
     amount: amt, title: ge('tp-title').textContent,
-    useBullpen: false,
   });
 
   if (r.error) {
@@ -878,7 +840,7 @@ function renderBotTrades(trades) {
       <td>${fmtUSD(t.amount||0)}</td>
       <td class="mono">${(t.price||0).toFixed(3)}</td>
       <td>${bdg(t.aiScore||0)}</td>
-      <td><span class="chip chip-${t.source==='bullpen'?'amber':'buy'}">${t.source||'clob'}</span></td>
+      <td><span class="chip chip-buy">${(t.source||'clob_v2').replace(/_/g,' ')}</span></td>
       <td>${t.simulated?chip('SIGNED','sim'):chip('LIVE','live')}</td>
       <td class="sm mt">${fmtD(t.recordedAt||t.cycleAt)}</td>
     </tr>`).join('')}
@@ -892,7 +854,6 @@ async function startBot() {
     maxExposure:  parseInt(ge('b-exposure').value)  || 60,
     stopLoss:     parseInt(ge('b-stoploss').value)  || 50,
     minScore:     parseInt(ge('b-score').value)    || 55,
-    useBullpen:   ge('b-exec').value === 'bullpen',
   });
   if (r.error) toast('❌ '+r.error,'err');
   else { toast('🤖 Bot started!','ok'); refreshBot(); }
@@ -911,58 +872,6 @@ async function addTarget() {
   ge('target-id').value = '';
   toast('Target market added','ok');
   refreshBot();
-}
-
-// ══════════════════════════════════════════════════════════
-// BULLPEN PAGE
-// ══════════════════════════════════════════════════════════
-async function loadBullpen() { checkStatus(); }
-
-async function installSkill() {
-  const sk = ge('bp-skill-status');
-  sk.innerHTML = ldr('Running: bullpen skill install …');
-  const r = await api('/bullpen/install-skill', 'POST');
-  if (r.ok) {
-    toast('✅ Bullpen AI skill installed!', 'ok');
-    checkStatus();
-  } else {
-    sk.innerHTML = errBox(`Skill install failed: ${r.output || r.error || 'unknown error'}`);
-    toast('❌ Skill install failed — run manually: bullpen skill install', 'err');
-  }
-}
-
-async function bpRun(cmd) {
-  const out = ge('bp-output');
-  out.innerHTML = ldr(`Running bullpen ${cmd}…`);
-  const endpointMap = {
-    balances:   '/bullpen/balances',
-    positions:  '/bullpen/positions',
-    orders:     '/bullpen/orders',
-    leaderboard:'/bullpen/leaderboard',
-    feed:       '/bullpen/feed',
-    discover:   '/bullpen/discover',
-    cancel:     '/bullpen/cancel-orders',
-  };
-  const endpoint = endpointMap[cmd];
-  const method   = cmd === 'cancel' ? 'POST' : 'GET';
-  const r = await api(endpoint, method);
-  out.innerHTML = `<pre style="white-space:pre-wrap;font-size:11px">${r.raw || JSON.stringify(r,null,2) || 'No output'}</pre>`;
-}
-
-async function bpSearch() {
-  const q = ge('bp-search-q').value.trim();
-  if (!q) return;
-  ge('bp-output').innerHTML = ldr(`Searching "${q}"…`);
-  const r = await api(`/bullpen/search?q=${encodeURIComponent(q)}`);
-  ge('bp-output').innerHTML = `<pre style="white-space:pre-wrap;font-size:11px">${r.raw || JSON.stringify(r,null,2)}</pre>`;
-}
-
-async function bpPrice() {
-  const slug = ge('bp-price-slug').value.trim();
-  if (!slug) return;
-  ge('bp-output').innerHTML = ldr(`Fetching price for "${slug}"…`);
-  const r = await api(`/bullpen/price?slug=${encodeURIComponent(slug)}`);
-  ge('bp-output').innerHTML = `<pre style="white-space:pre-wrap;font-size:11px">${r.raw || JSON.stringify(r,null,2)}</pre>`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -990,7 +899,7 @@ async function loadSettings() {
         <div class="fw">${port.username||'Anonymous'}</div>
         <div class="mono sm mt" style="user-select:all">${port.address}</div>
       </div>
-      <a href="https://polymarket.com/profile/${port.address}" target="_blank" class="btn btn-ghost btn-sm">polymarket.com ↗</a>
+      <a href="https://polymarket.com/profile/${port.polymarketProfileAddress || port.tradingAddress || port.address}" target="_blank" class="btn btn-ghost btn-sm">polymarket.com ↗</a>
     </div>
     <div class="sg4" style="margin-top:12px;margin-bottom:0">
       <div class="sc"><div class="sl">BALANCE</div><div class="sv up">${fmtUSD(port.cashBalance)}</div></div>
