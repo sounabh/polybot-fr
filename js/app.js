@@ -4,12 +4,12 @@
  * No direct Polymarket API calls from the browser — everything goes through the server.
  */
 
-// When the UI is served from this app (http/https), use the same origin for /api (e.g. localhost:3001)
-const API_BASE =
-  (typeof window !== 'undefined' && window.location &&
+// Same-origin when UI is served by this server. Override: <script>window.POLY_API_BASE='https://host'</script> before this file.
+const API_BASE = (typeof window !== 'undefined' && window.POLY_API_BASE) ||
+  ((typeof window !== 'undefined' && window.location &&
     (window.location.protocol === 'http:' || window.location.protocol === 'https:'))
     ? window.location.origin
-    : '';
+    : '');
 
 // ── State ─────────────────────────────────────────────────
 const App = {
@@ -23,11 +23,29 @@ const App = {
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
+  const url = API_BASE + '/api' + path;
   try {
-    const r = await fetch(API_BASE + '/api' + path, opts);
-    return r.json();
+    const r = await fetch(url, opts);
+    const text = await r.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return { error: text.slice(0, 120) || `HTTP ${r.status}` };
+      }
+    }
+    if (!r.ok && data.error == null && data.message == null) {
+      data.error = typeof data === 'object' && data !== null && !Array.isArray(data)
+        ? (data.detail || `HTTP ${r.status}`)
+        : `HTTP ${r.status}`;
+    }
+    return data;
   } catch (e) {
-    return { error: e.message };
+    return {
+      error: e.message || 'Network error',
+      hint: !API_BASE ? 'Open the app via http://localhost:3001 (same server as the API), or set window.POLY_API_BASE.' : null,
+    };
   }
 }
 
@@ -196,7 +214,19 @@ async function loadDash() {
   const [port, botSt] = await Promise.all([
     api('/portfolio'), api('/bot/status'),
   ]);
-  if (port.error) return;
+  if (port.error) {
+    ge('d-bal').textContent = '—';
+    ge('d-rp').textContent = '—';
+    ge('d-up').textContent = '—';
+    ge('d-pos').textContent = '—';
+    ge('d-today').textContent = '—';
+    ge('d-spnl').textContent = '—';
+    const hint = port.hint ? `<div class="notice warn mb12">${port.hint}</div>` : '';
+    ge('d-pos-tbl').innerHTML = hint + errBox(port.error);
+    ge('d-trades-tbl').innerHTML = errBox(port.error);
+    renderBotWidget(botSt || {});
+    return;
+  }
   App.portfolio = port;
 
   ge('d-bal').textContent  = fmtUSD(port.cashBalance);
@@ -215,11 +245,16 @@ async function loadDash() {
     ge('d-spnl').className    = 'sv ' + (sp >= 0 ? 'up' : 'dn');
   }
 
-  // Positions table with SELL buttons
-  renderPosMini(port.positions || [], 'd-pos-tbl');
-  renderTradesMini((port.recentTrades || []).slice(0, 6), 'd-trades-tbl');
+  if (port.walletConfigured === false) {
+    ge('d-pos-tbl').innerHTML =
+      `<div class="notice warn mb12">No <code>PRIVATE_KEY</code> in server <code>.env</code> — showing empty portfolio. Add your key and restart to load live Polymarket data.</div>` +
+      empty('No open positions');
+    ge('d-trades-tbl').innerHTML = empty('No recent trades');
+  } else {
+    renderPosMini(port.positions || [], 'd-pos-tbl');
+    renderTradesMini((port.recentTrades || []).slice(0, 6), 'd-trades-tbl');
+  }
 
-  // Bot status widget
   renderBotWidget(botSt);
 }
 
@@ -276,6 +311,12 @@ async function loadProfile() {
   const port = await api('/portfolio');
   if (port.error) { ge('profile-content').innerHTML = errBox(port.error); return; }
   App.portfolio = port;
+  if (port.walletConfigured === false) {
+    ge('profile-content').innerHTML =
+      `<div class="notice warn mb16">Configure <code>PRIVATE_KEY</code> in the server <code>.env</code> and restart to load your Polymarket username, balance, and trades.</div>` +
+      empty('Profile unavailable until wallet is configured');
+    return;
+  }
 
   ge('profile-content').innerHTML = `
     <div class="profile-hero">
@@ -665,6 +706,12 @@ async function loadTrades() {
   ge('trades-content').innerHTML = ldr('Loading trade history…');
   const port = await api('/portfolio');
   if (port.error) { ge('trades-content').innerHTML = errBox(port.error); return; }
+  if (port.walletConfigured === false) {
+    ge('trades-content').innerHTML =
+      `<div class="notice warn mb12">Add <code>PRIVATE_KEY</code> to <code>.env</code> to load your trade history from Polymarket.</div>` +
+      empty('No trades to show');
+    return;
+  }
   const tr = port.recentTrades || [];
   if (!tr.length) { ge('trades-content').innerHTML = empty('No trades on this wallet'); return; }
   ge('trades-content').innerHTML = `<div class="tscroll"><table class="tbl"><thead><tr>
@@ -899,6 +946,12 @@ async function loadSettings() {
   const el   = ge('settings-account');
   if (!port || port.error) { el.innerHTML = empty('Could not load account'); return; }
   App.portfolio = port;
+  if (port.walletConfigured === false) {
+    el.innerHTML =
+      `<div class="notice warn mb12">No wallet on the server — add <code>PRIVATE_KEY</code> to <code>.env</code> to link your Polymarket account here.</div>` +
+      empty('Account not connected');
+    return;
+  }
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div class="av" style="width:48px;height:48px">
